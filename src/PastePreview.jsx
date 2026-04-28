@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createWorker } from 'tesseract.js';
 
 async function getTextFromImage(imageUrl) {
@@ -24,17 +24,33 @@ export default function PastePreview() {
   const [error, setError] = useState('')
   const hasPastedContent = Boolean(text || imageUrl)
 
-  const handlePaste = (e) => {
+  const applyPastedImage = useCallback((file) => {
+    setImageUrl(URL.createObjectURL(file))
+    setText('')
+    setEventDraft(null)
+    setError('')
+  }, [])
+
+  const applyPastedText = useCallback((pastedText) => {
+    const trimmedText = pastedText.slice(0, MAX_TEXT_CHARS)
+    setText(trimmedText)
+    setImageUrl('')
+    setEventDraft(null)
+    setError(
+      pastedText.length > MAX_TEXT_CHARS
+        ? `Pasted text was trimmed to ${MAX_TEXT_CHARS.toLocaleString()} characters.`
+        : '',
+    )
+  }, [])
+
+  const handlePaste = useCallback((e) => {
     const items = e.clipboardData.items
 
     for (const item of items) {
       if (item.type.startsWith('image/')) {
         const file = item.getAsFile()
         if (file) {
-          setImageUrl(URL.createObjectURL(file))
-          setText('')
-          setEventDraft(null)
-          setError('')
+          applyPastedImage(file)
           return
         }
       }
@@ -42,15 +58,35 @@ export default function PastePreview() {
 
     const pastedText = e.clipboardData.getData('text')
     if (pastedText) {
-      const trimmedText = pastedText.slice(0, MAX_TEXT_CHARS)
-      setText(trimmedText)
-      setImageUrl('')
-      setEventDraft(null)
-      setError(
-        pastedText.length > MAX_TEXT_CHARS
-          ? `Pasted text was trimmed to ${MAX_TEXT_CHARS.toLocaleString()} characters.`
-          : '',
-      )
+      applyPastedText(pastedText)
+    }
+  }, [applyPastedImage, applyPastedText])
+
+  const handlePasteButtonClick = async () => {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error('Clipboard access is not available in this browser.')
+      }
+
+      if (navigator.clipboard.read) {
+        const items = await navigator.clipboard.read()
+        for (const item of items) {
+          const imageType = item.types.find((type) => type.startsWith('image/'))
+          if (imageType) {
+            const blob = await item.getType(imageType)
+            applyPastedImage(blob)
+            return
+          }
+        }
+      }
+
+      const pastedText = await navigator.clipboard.readText()
+      if (!pastedText) {
+        throw new Error('Clipboard is empty. Copy text/image and try again.')
+      }
+      applyPastedText(pastedText)
+    } catch {
+      setError('Tap + hold and use Paste on mobile, or press Ctrl/Command + V.')
     }
   }
 
@@ -58,7 +94,7 @@ export default function PastePreview() {
     const onPaste = (pasteEvent) => handlePaste(pasteEvent)
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
-  }, [])
+  }, [handlePaste])
 
   const handleSubmit = async () => {
     setError('')
@@ -270,8 +306,8 @@ export default function PastePreview() {
 
   return (
     <div className="paste-preview" style={{ outline: 'none' }}>
-      <button type="button" className="counter">
-        Paste with Ctrl/Command + V
+      <button type="button" className="counter" onClick={handlePasteButtonClick}>
+        Paste with Ctrl/Command + V (or tap this button on mobile)
       </button>
       <div className={`pasted-content ${hasPastedContent ? 'pasted-content-enter' : 'pasted-content-exit'}`}>
           {text && (
