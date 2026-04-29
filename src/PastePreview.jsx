@@ -119,59 +119,18 @@ export default function PastePreview() {
   }
 
   const getCalEventFromText = async (pastedText) => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-    if (!apiKey) {
-      throw new Error('Missing VITE_GEMINI_API_KEY in your .env file.')
-    }
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  text:
-                    'Extract one calendar event from this text. Return ONLY JSON with keys: title, description, location, start_iso, end_iso. start_iso and end_iso must be valid ISO datetime strings. If no year is given, use the current year. If no timezone is given, use the current timezone. If no event details are given, return an empty response.\n\nText:\n' +
-                    pastedText,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-          },
-        }),
-      },
-    )
+    const response = await fetch('/.netlify/functions/parse-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: pastedText }),
+    })
 
     if (!response.ok) {
       const failed = await response.json().catch(() => null)
-      throw new Error(failed?.error?.message || 'Gemini request failed.')
+      throw new Error(failed?.error || 'Could not parse event.')
     }
 
-    const data = await response.json()
-    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!raw) {
-      throw new Error('Gemini returned an empty response.')
-    }
-
-    let parsed
-    try {
-      parsed = JSON.parse(raw)
-    } catch {
-      throw new Error('Gemini response was not valid JSON.')
-    }
-
-    if (!parsed.title || !parsed.start_iso || !parsed.end_iso) {
-      throw new Error('Gemini response is missing required event fields.')
-    }
-
-    return parsed
+    return response.json()
   }
 
   const getCalEventFromImage = async (pastedImageUrl) => {
