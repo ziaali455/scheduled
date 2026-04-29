@@ -7,12 +7,15 @@ exports.handler = async (event) => {
     }
   }
 
-  const apiKey = process.env.GEMINI_API_KEY
+  const apiKey = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '').trim()
   if (!apiKey) {
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Server misconfigured: missing GEMINI_API_KEY' }),
+      body: JSON.stringify({
+        error:
+          'Server misconfigured: missing GEMINI_API_KEY (or VITE_GEMINI_API_KEY). Set it in Netlify Site settings > Environment variables, then redeploy.',
+      }),
     }
   }
 

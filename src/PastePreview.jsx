@@ -88,6 +88,7 @@ export default function PastePreview() {
     } catch {
       setError('Tap + hold and use Paste on mobile, or press Ctrl/Command + V.')
     }
+    //fugaze
   }
 
   useEffect(() => {
