@@ -8,7 +8,7 @@ function App() {
     // .
     console.log('Paste shortcut detected:', event)
   }
-
+//fugaze
   useEffect(() => {
     const onKeyDown = (event) => {
       const isVKey = event.key.toLowerCase() === 'v'
